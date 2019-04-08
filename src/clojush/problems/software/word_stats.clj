@@ -33,52 +33,60 @@
   file_readchar
   ^{:stack-types [:char]}
   (fn [state]
-    (let [file (top-item :input state)
-          first-char (first file)
-          inp-result (push-item (apply str (rest file))
-                                :input
-                                (pop-item :input state))]
-      (if (= file "")
-        state
-        (push-item first-char
-                   :char
-                   inp-result)))))
+    (if (:autoconstructing state)
+      state
+      (let [file (top-item :input state)
+            first-char (first file)
+            inp-result (push-item (apply str (rest file))
+                                  :input
+                                  (pop-item :input state))]
+        (if (= file "")
+          state
+          (push-item first-char
+                     :char
+                     inp-result))))))
 
 (define-registered
   file_readline
   ^{:stack-types [:string]}
   (fn [state]
-    (let [file (top-item :input state)
-          index (inc (.indexOf file "\n"))
-          has-no-newline (= 0 index)
-          inp-result (push-item (if has-no-newline
-                                  ""
-                                  (subs file index))
-                                :input
-                                (pop-item :input state))]
-      (if (= file "")
-        state
-        (if has-no-newline
-          (push-item file :string inp-result)
-          (push-item (subs file 0 index)
-                     :string
-                     inp-result))))))
+    (if (:autoconstructing state)
+      state
+      (let [file (top-item :input state)
+            index (inc (.indexOf file "\n"))
+            has-no-newline (= 0 index)
+            inp-result (push-item (if has-no-newline
+                                    ""
+                                    (subs file index))
+                                  :input
+                                  (pop-item :input state))]
+        (if (= file "")
+          state
+          (if has-no-newline
+            (push-item file :string inp-result)
+            (push-item (subs file 0 index)
+                       :string
+                       inp-result)))))))
 
 (define-registered
   file_EOF
   ^{:stack-types [:boolean]}
   (fn [state]
-    (let [file (top-item :input state)
-          result (empty? file)]
-      (push-item result :boolean state))))
+    (if (:autoconstructing state)
+      state
+      (let [file (top-item :input state)
+            result (empty? file)]
+        (push-item result :boolean state)))))
 
 (define-registered
   file_begin
   ^{:stack-types [:input]}
   (fn [state]
-    (push-item (stack-ref :input 1 state)
-               :input
-               (pop-item :input state))))
+    (if (:autoconstructing state)
+      state
+      (push-item (stack-ref :input 1 state)
+                 :input
+                 (pop-item :input state)))))
 
 ; Atom generators
 (def word-stats-atom-generators
@@ -185,11 +193,11 @@
 (defn make-word-stats-error-function-from-cases
   [train-cases test-cases]
   (fn the-actual-word-stats-error-function
-    ([program]
-      (the-actual-word-stats-error-function program :train))
-    ([program data-cases] ;; data-cases should be :train or :test
-                          (the-actual-word-stats-error-function program data-cases false))
-    ([program data-cases print-outputs]
+    ([individual]
+      (the-actual-word-stats-error-function individual :train))
+    ([individual data-cases] ;; data-cases should be :train or :test
+     (the-actual-word-stats-error-function individual data-cases false))
+    ([individual data-cases print-outputs]
       (let [behavior (atom '())
             errors (flatten
                      (doall
@@ -197,7 +205,7 @@
                                                                                      :train train-cases
                                                                                      :test test-cases
                                                                                      [])]
-                         (let [final-state (run-push program
+                         (let [final-state (run-push (:program individual)
                                                      (->> (make-push-state)
                                                        (push-item input :input)
                                                        (push-item input :input)
@@ -206,8 +214,7 @@
                            (when print-outputs
                              (println (format "\n| Correct output: %s\n| Program output: %s" (pr-str correct-output) (pr-str result))))
                            ; Record the behavior
-                           (when @global-print-behavioral-diversity
-                             (swap! behavior conj result))
+                           (swap! behavior conj result)
                            ; Errors:
                            ;  1. Levenshtein distance of outputs
                            ;  2. If contains a line of the form #"number of sentences: (-?\d+)", then integer distance from correct output; otherwise penalty
@@ -223,9 +230,9 @@
                                (round-to-n-decimal-places (abs (- result-f words-per-sentence)) 4)
                                10000.0) ;Penalty
                              )))))]
-        (when @global-print-behavioral-diversity
-          (swap! population-behaviors conj @behavior))
-        errors))))
+        (if (= data-cases :train)
+          (assoc individual :behaviors @behavior :errors errors)
+          (assoc individual :test-errors errors))))))
 
 (defn get-word-stats-train-and-test
   "Returns the train and test cases."
@@ -250,8 +257,7 @@
 (defn word-stats-report
   "Custom generational report."
   [best population generation error-function report-simplifications]
-  (let [best-program (not-lazy (:program best))
-        best-test-errors (error-function best-program :test)
+  (let [best-test-errors (:test-errors (error-function best :test))
         best-total-test-error (apply +' best-test-errors)]
     (println ";;******************************")
     (printf ";; -*- Word Stats problem report - generation %s\n" generation)(flush)
@@ -264,7 +270,7 @@
         (println (format "Test Case  %3d | Error: %s" i (str error)))))
     (println ";;------------------------------")
     (println "Outputs of best individual on training cases:")
-    (error-function best-program :train true)
+    (error-function best :train true)
     (println ";;******************************")
     )) ;; To do validation, could have this function return an altered best individual
        ;; with total-error > 0 if it had error of zero on train but not on validation
@@ -292,9 +298,9 @@
    :uniform-mutation-rate 0.01
    :problem-specific-report word-stats-report
    :problem-specific-initial-report word-stats-initial-report
-   :print-behavioral-diversity true
    :report-simplifications 0
    :final-report-simplifications 5000
    :error-threshold 0.02
    :max-error 10000
    })
+
