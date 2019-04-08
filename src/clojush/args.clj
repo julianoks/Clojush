@@ -188,6 +188,12 @@
          :gene-selection-rate 1.0
           ;; When using gene-selection, the probability of selecting a new parent when moving
           ;; to the next gene.
+        
+         :geometric-lexicase-rate 0.9
+          ;; A value in the interval (0,1]
+          ;; The common ratio in the geometric progression of geometric lexicase selection.
+          ;; When rate=1, geometric lexicase is equivalent to conventional lexicase.
+          ;; see clojush.pushgp.selection.lexicase-geometric
          
          :autoconstructive false
           ;; If true, then :genetic-operator-probabilities will be {:autoconstruction 1.0},
@@ -297,7 +303,7 @@
           ;;----------------------------------------
          
          :parent-selection :lexicase
-          ;; The parent selection method. Options include :tournament, :lexicase, :epsilon-lexicase,
+          ;; The parent selection method. Options include :tournament, :lexicase, :geometric-lexicase, :epsilon-lexicase,
           ;; :elitegroup-lexicase, :uniform, :leaky-lexicase, :random-threshold-lexicase,
           ;; :random-toggle-lexicase, :randomly-truncated-lexicase, :novelty-search
          

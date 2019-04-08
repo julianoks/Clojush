@@ -1,6 +1,6 @@
 (ns clojush.pushgp.selection.selection
   (:use [clojush globals random]
-        [clojush.pushgp.selection preselection tournament lexicase epsilon-lexicase
+        [clojush.pushgp.selection preselection tournament lexicase lexicase-geometric epsilon-lexicase
          elitegroup-lexicase random-threshold-lexicase random-toggle-lexicase 
          randomly-truncated-lexicase novelty rarified-lexicase]))
 
@@ -12,6 +12,7 @@
         selected (case parent-selection
                    :tournament (tournament-selection preselected argmap)
                    :lexicase (lexicase-selection preselected argmap)
+                   :geometric-lexicase (geometric-lexicase-selection pop-with-meta-errors argmap)
                    :epsilon-lexicase (epsilon-lexicase-selection preselected argmap)
                    :elitegroup-lexicase (elitegroup-lexicase-selection preselected argmap)
                    :random-threshold-lexicase (random-threshold-lexicase-selection 
